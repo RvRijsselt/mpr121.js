@@ -34,7 +34,8 @@ var Const = {
 	ELE11_R : 0x58,
 	ELE12_T : 0x59,
 	ELE12_R : 0x5A,
-
+    MPR_DEBOUNCE : 0x5B,
+    MPR_CONFIG1 : 0x5C,
 	FIL_CFG : 0x5D,
 	ELE_CFG : 0x5E,
 	GPIO_CTRL0 : 0x73,

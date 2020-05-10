@@ -2,10 +2,11 @@ var i2c = require('i2c-bus');
 var Gpio = require('onoff').Gpio;
 var constants = require('./const');
 
-function Mpr121(address, i2cBus, touchThreshold, releaseRhreshold) {
+function Mpr121(address, i2cBus, touchThreshold, releaseRhreshold, sensitiveFilter) {
 	this.address = address;
 	this.i2cBus = i2cBus;
 
+    this.sensitiveFilter = sensitiveFilter || false; 
 	this.touchThreshold = touchThreshold || constants.TOU_THRESH;
 	this.releaseRhreshold = releaseRhreshold || constants.REL_THRESH;
 	this.touchStates = new Array(12);
@@ -105,20 +106,20 @@ Mpr121.prototype.onRead = function(values) {
 Mpr121.prototype.setup = function() {
 	if (!this.started) {
 		console.log("Mpr121 initialize - touch " + this.touchThreshold
-				+ " - release - " + this.releaseRhreshold);
+				+ " - release - " + this.releaseRhreshold + " - sensitive = " + this.sensitiveFilter);
 		this.setRegister(constants.ELE_CFG, 0x00);
 
 		// Section A - Controls filtering when data is > baseline.
 		this.setRegister(constants.MHD_R, 0x01);
 		this.setRegister(constants.NHD_R, 0x01);
-		this.setRegister(constants.NCL_R, 0x00);
-		this.setRegister(constants.FDL_R, 0x00);
+		this.setRegister(constants.NCL_R, this.sensitiveFilter ? 0x0E : 0x00);
+		this.setRegister(constants.FDL_R, this.sensitiveFilter ? 0x01 : 0x00);
 
 		// Section B - Controls filtering when data is < baseline.
 		this.setRegister(constants.MHD_F, 0x01);
-		this.setRegister(constants.NHD_F, 0x01);
-		this.setRegister(constants.NCL_F, 0xFF);
-		this.setRegister(constants.FDL_F, 0x02);
+		this.setRegister(constants.NHD_F, this.sensitiveFilter ? 0x05 : 0x01);
+		this.setRegister(constants.NCL_F, this.sensitiveFilter ? 0x01 : 0xFF);
+		this.setRegister(constants.FDL_F, this.sensitiveFilter ? 0x40 : 0x02);
 
 		// Section C - Sets touch and release thresholds for each electrode
 		this.setRegister(constants.ELE0_T, this.touchThreshold);
@@ -160,15 +161,23 @@ Mpr121.prototype.setup = function() {
 		this.setRegister(constants.ELE12_T, this.touchThreshold);
 		this.setRegister(constants.ELE12_R, this.releaseRhreshold);
 
-		// Section D
-		// Set the Filter Configuration
-		// Set ESI2
-		this.setRegister(constants.FIL_CFG, 0x04);
+        if (this.sensitiveFilter) {
+            this.setRegister(constants.MPR_DEBOUNCE, 0x00);
+            this.setRegister(constants.MPR_CONFIG1, 0x10);
+            this.setRegister(constants.FIL_CFG, 0x20);
+            this.setRegister(constants.ELE_CFG, 0x8F);
+        } else {
+            // Section D
+            // Set the Filter Configuration
+            // Set ESI2
+            this.setRegister(constants.FIL_CFG, 0x04);
 
-		// Section E
-		// Electrode Configuration
-		// Set ELE_CFG to 0x00 to return to standby mode
-		this.setRegister(constants.ELE_CFG, 0x0C); // Enables all 12 Electrodes
+            // Section E
+            // Electrode Configuration
+            // Set ELE_CFG to 0x00 to return to standby mode
+            this.setRegister(constants.ELE_CFG, 0x0C); // Enables all 12 Electrodes
+        }
+
 
 		console.log("Mpr121 initialized");
 		this.started = true;
